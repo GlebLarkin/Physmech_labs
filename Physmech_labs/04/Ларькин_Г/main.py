@@ -1,103 +1,79 @@
-'''
-Лабораторная работа 04
-*Исследование колебаний жидкости в канале*
-Авторы - Глеб Ларькин, Валентина Копышева, Дай Сюй, Себастиан Хулио
-11.03.26
-== Установка
-Кювета $h in [-h_2, h_1]$ с двумя жидкостями колебается в поле тяготения Земли. 
-На границе $z = \ksi(x, t)$ - форма границы.
-
-Снизу границы раздела $\rho_2, P_2, \phi_2$
-Сверху границы раздела $\rho_1, P_1, \phi_1$
-
-== Теория (по Кривецу)
-Приближения:
-- Электролизом принебрегаем
-- Установка сама колебается
-- Волна стоячая
-
-$ u = \nabla \varphi $
-$ \laplasian \varphi = 0 $
-$ d phi / dt + P / \rho + gz = const $ - конвекции нет, так как малые колебания.
-Также нет завихренности -> пренебрегаем $u (nabla u)$
-Считаем $a \kappa << 1$ -> $\ksi \kappa << 1$
-
-На границе $\varphi_1 = \varphi2 = \ksi'$
-
-Итого система:
-$ \varphi_1 = \varphi2 = \ksi' $
-$ d phi / dt + P / \rho + gz = const $
-$ \laplasian \varphi = 0 $
-
-Ищем решение в виде разделенной временной и пространтственной части.
-(Решение ищем в виде $phi = T(t) X(x) Z(z)$) 
-
-Задача Штурма-Лиувилля:
-$ X'' / X = Z'' / Z = -\kappa^2 $
-
-Решаем ... (см Л_Л)
-
-Имеем:
-$\varpsi_1 = T_1 cos(\kappa x) * ch((z - h_1)\kappa)$
-$\varpsi_2 = T_2 cos(\kappa x) * ch((z + h-2)\kappa)$
-# Взяли ch вместо exp, тк нужно удовлетворить условию непротекания на дне/потолке
-# Глоабльно мы хотим все выразить через дисперсионное соотношение, 
-те получить \omega(\kappa)
-
-На границе параметры не испытывают скачка.
-
-На границе $P_1 = P_2$:
-Выразим из исходной системы $z = \ksi$ (на границе) и продифферецируем:
-$ \ksi' = (\rho_1 phi_1''_tt - rho_2 phi_2''_tt) / (\rho_2 - \rho_1)g $
-
-Дифферецируем $\varphi_1, \varphi_2$ в точке $\ksi$ 
-(а затем приравниваем и раскладываем по малости):
-$ - T_1 sh(h_1\kappa) = T_2 sh(h_2 \kappa) $
-
-Отсюда $T_2 = - T_1 sh(h_1 \kappa) / sh(h_2 \kappa)$
-
-(Знаем $\vatphi_1, \varphi_2, T2$)
-
-При $\varphi_1' = \ksi'$:
-$ - T_1 sh(\kappa h_1) \kappa = (\pho_1 T_1'' ch(\kappa h_1) + \rho_2 T_1'' sh(h_1 \kappa) / sh(h_2 \kappa) ch(\kappa h_2)) / (\rho_2 - \rho_1)g $
-После причесывания этой формулы получим:
-$ -T_1 \kappa = (T_1'' (\rho_1 cth(\kappa h_1) + \rho_2 cth(\kappa h_2)) / (\rho_2 - \rho_1)g) $
-
-Из диффура по определению $\omega$:
-При $rho_1 = 0$:
-$ \omega^2 = \kappa g th(\kappa h) $ при $\kappa = n pi / L$ (см 4.15 учебника)
-
-Тогда амплитуда $a ~ exp(\omega t)$, 
-фазовая и группова яскорости: $\omega / \kappa$, $d \omega / d \kappa$
-Также h мало, можно разложить в Тейлора.
-
-== Работа
-Нужно будет сделать FT cс помощью python 
-(И понимать, как что работает. А обратное уметь делать на сдаче)
-Стр 423 справочник по математике для инженеров и учащихся вузов
-Бронштейн, Семендяев
-
-Хотим снять $\omega(\kappa)$. 
-Ожидаем $\omega ~ sqrt(\kappa)$
-
-Контрольный вопрос - по каким траекториям двигаются частицы?
-'''
-
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy as sp 
+import matplotlib as mpl
+import scipy as sp
 import pandas as pd
 
 class consts:
-    h = 3.4  # cм - глубина жидкости в кювете pm 0.1
-    g = 9.8  # м / с^2
-    L = 1.44 # м - длина кюветы. pm 1 см
+    h     = 3.5  * 1e-2  # м — глубина жидкости в кювете
+    dh    = 0.5  * 1e-2  # м — погрешность h
+    g     = 9.8          # м/с²
+    L     = 1.44         # м — длина кюветы
+    dL    = 3.0  * 1e-2  # м — погрешность L
 
 class data_exp1:
-    ### Первая серия экспериментов - зависимость omega от k
-    # lambdas = np.array([])
-    kappa = range(2, 21) # шт - количество гармоник
-    freq = np.array([]) # Гц - частота генератора
-    
-    # kappa = 2 * pi / lambdas
-    omega = 2 * np.pi * freq
+    ### Зависимость omega от k
+
+    # ── Теория ──────────────────────────────────────────────────────────────
+    n_theor      = np.array(range(1, 30))
+    kappa_theor  = np.pi * n_theor / consts.L
+    freq_theor   = np.sqrt(kappa_theor * consts.g * np.tanh(kappa_theor * consts.h)) / (2 * np.pi)
+    omega_theor  = 2 * np.pi * freq_theor
+
+    # Погрешность теоретической кривой по h
+    # d(omega)/d(h) через дисперсионное соотношение:
+    # omega = sqrt(g*k*tanh(k*h))  =>
+    # d(omega)/d(h) = g*k^2 / (2*omega * cosh^2(k*h))
+    domega_theor_dh = (consts.g * kappa_theor**2
+                       / (2 * omega_theor * np.cosh(kappa_theor * consts.h)**2))
+    domega_theor    = domega_theor_dh * consts.dh   # абс. погрешность omega_theor
+
+    # ── Эксперимент ─────────────────────────────────────────────────────────
+    # Гц — выставляемые частоты генератора (теоретически предсказанные)
+    freq_for_exp = np.array([1.85, 2.0, 2.15, 2.29, 2.43, 2.56,
+                             2.68, 2.80, 2.91, 3.02, 3.13])
+    # м — измеренные длины волн
+    lambdas_exp  = np.array([24, 18, 17, 13, 13, 15,
+                             14, 14, 11, 12, 11]) * 1e-2
+    dlambda      = 3e-2  # м — погрешность lambda
+
+    omega_exp  = 2 * np.pi * freq_for_exp
+    kappa_exp  = 2 * np.pi / lambdas_exp
+
+    # Погрешность kappa: kappa = 2*pi/lambda  =>  d(kappa) = kappa * dlambda / lambda
+    dkappa_exp = kappa_exp * dlambda / lambdas_exp
+
+
+# ── График ──────────────────────────────────────────────────────────────────
+
+fig, ax = plt.subplots(figsize=(8, 5.5))
+fig.patch.set_facecolor("#FAFAF7")
+ax.set_facecolor("#FAFAF7")
+
+# Теоретическая кривая с полосой погрешности
+ax.plot(data_exp1.kappa_theor, data_exp1.omega_theor,
+        color="#1a3a5c", lw=2, label=r"Теория: $\omega = \sqrt{g\kappa\tanh(\kappa h)}$", zorder=3)
+ax.fill_between(data_exp1.kappa_theor,
+                data_exp1.omega_theor - data_exp1.domega_theor,
+                data_exp1.omega_theor + data_exp1.domega_theor,
+                color="#1a3a5c", alpha=0.15, label=r"Погрешность по $h$", zorder=2)
+
+# Экспериментальные точки с крестами погрешностей
+ax.errorbar(data_exp1.kappa_exp, data_exp1.omega_exp,
+            xerr=data_exp1.dkappa_exp,
+            fmt="o", color="#c0392b", markersize=6,
+            ecolor="#c0392b", elinewidth=1.4, capsize=4, capthick=1.4,
+            label=r"Эксперимент $\pm\,\delta\kappa$", zorder=4)
+
+# Оформление
+ax.set_xlabel(r"Волновое число $\kappa$, м$^{-1}$", fontsize=13)
+ax.set_ylabel(r"Циклическая частота $\omega$, рад/с", fontsize=13)
+ax.set_title(r"Дисперсионное соотношение: $\omega(\kappa)$", fontsize=14, pad=12)
+
+ax.legend(framealpha=0.6, fontsize=11, loc="upper left")
+ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.5, color="#888")
+ax.tick_params(labelsize=11)
+
+fig.tight_layout()
+
+plt.show()
